@@ -265,6 +265,7 @@ nav { position: relative; padding: 16px 12px; flex: 1; overflow-y: auto; }
     <div class="nav-item" onclick="showPage('briefings')"><span class="nav-icon">🌅</span> Briefing History</div>
     <div class="nav-item" onclick="showPage('lms')"><span class="nav-icon">🔗</span> LMS Tracker</div>
     <div class="nav-section">System</div>
+    <div class="nav-item" onclick="showPage('datamanager')"><span class="nav-icon">🗃️</span> Data Manager</div>
     <div class="nav-item" onclick="showPage('exports')"><span class="nav-icon">📊</span> Exports</div>
     <div class="nav-item" onclick="showPage('settings')"><span class="nav-icon">⚙️</span> Settings</div>
   </nav>
@@ -452,6 +453,17 @@ nav { position: relative; padding: 16px 12px; flex: 1; overflow-y: auto; }
         <div class="card"><div class="card-body" style="text-align:center;padding:32px;"><div style="font-size:40px;margin-bottom:12px;">✅</div><div style="font-weight:700;margin-bottom:6px;">VP Tasks</div><div style="font-size:12px;color:var(--muted);margin-bottom:16px;">All tasks with status as a Google Sheet</div><button class="btn btn-primary" onclick="triggerExport('tasks', this)">Export to Sheet</button></div></div>
       </div>
       <div class="card" style="margin-top:20px;"><div class="card-body" style="font-size:13px;color:var(--muted);line-height:1.8;">ℹ️ Clicking Export triggers your Google Apps Script, which reads from Supabase, creates a Google Sheet, and emails the link to <strong>umathephysicsteacher.in@gmail.com</strong>. Check your Gmail after clicking.</div></div>
+    </div>
+
+    <!-- DATA MANAGER -->
+    <div class="page" id="page-datamanager">
+
+      <!-- Table selector tabs -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;" id="dm-tabs"></div>
+
+      <!-- Active table panel -->
+      <div id="dm-panel"></div>
+
     </div>
 
     <!-- SETTINGS -->
@@ -765,6 +777,7 @@ const pages = {
   briefings: { title: 'Briefing History', sub: 'Past morning briefings' },
   lms: { title: 'LMS Tracker', sub: 'Syllabus coverage' },
   exports: { title: 'Exports', sub: 'Generate Google Sheets' },
+  datamanager: { title: 'Data Manager', sub: 'View, add, edit all tables — download & upload Excel templates' },
   settings: { title: 'Settings', sub: 'Configure your Command Centre' },
 };
 
@@ -786,6 +799,7 @@ function showPage(p) {
   if (p === 'settings') loadSettings();
   if (p === 'ai') checkDeployNotice();
   if (p === 'lms' && lmsData.length) renderLMS();
+  if (p === 'datamanager') initDataManager();
 }
 
 // ============================================================
@@ -1380,6 +1394,484 @@ function closeModal(id) { document.getElementById(id).classList.remove('open'); 
 document.querySelectorAll('.modal-overlay').forEach(m => {
   m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
 });
+
+// ============================================================
+// DATA MANAGER
+// ============================================================
+
+// SheetJS for reading uploaded xlsx
+const SHEETJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+let sheetJSLoaded = false;
+function loadSheetJS(cb) {
+  if (sheetJSLoaded) { cb(); return; }
+  const s = document.createElement('script');
+  s.src = SHEETJS_URL;
+  s.onload = () => { sheetJSLoaded = true; cb(); };
+  document.head.appendChild(s);
+}
+
+// Table definitions — maps to Supabase tables
+const DM_TABLES = [
+  {
+    id: 'teachers',
+    label: '👩‍🏫 Teachers',
+    table: 'teachers',
+    pkCol: 'teacher_id',
+    template: 'template_teachers.xlsx',
+    columns: [
+      { key: 'teacher_id',   label: 'ID',          type: 'id',     readonly: true },
+      { key: 'full_name',    label: 'Full Name',    type: 'text',   required: true },
+      { key: 'short_name',   label: 'Short Name',   type: 'text',   required: true },
+      { key: 'designation',  label: 'Designation',  type: 'select', options: ['PGT','TGT','PRT','HOD','Coordinator','Principal','VP'], required: true },
+      { key: 'department',   label: 'Department',   type: 'text' },
+      { key: 'phone',        label: 'Phone',        type: 'text' },
+      { key: 'email',        label: 'Email',        type: 'text' },
+      { key: 'subjects_taught', label: 'Subjects',  type: 'text' },
+      { key: 'remarks',      label: 'Remarks',      type: 'text' },
+    ],
+    extraInsert: () => ({ school_id: SB.schoolId() }),
+  },
+  {
+    id: 'subjects',
+    label: '📚 Subjects',
+    table: 'subjects',
+    pkCol: 'subject_id',
+    template: 'template_subjects.xlsx',
+    columns: [
+      { key: 'subject_id',   label: 'ID',          type: 'id',     readonly: true },
+      { key: 'subject_name', label: 'Subject',      type: 'text',   required: true },
+      { key: 'subject_code', label: 'Code',         type: 'text' },
+      { key: 'category',     label: 'Category',     type: 'select', options: ['Core','Language','Elective','Activity','Vocational'] },
+      { key: 'applicable_grades', label: 'Grades',  type: 'text' },
+      { key: 'remarks',      label: 'Remarks',      type: 'text' },
+    ],
+    extraInsert: () => ({ school_id: SB.schoolId() }),
+  },
+  {
+    id: 'sections',
+    label: '🏫 Classes & Sections',
+    table: 'sections',
+    pkCol: 'section_id',
+    template: 'template_classes_sections.xlsx',
+    columns: [
+      { key: 'section_id',         label: 'ID',             type: 'id',   readonly: true },
+      { key: 'grade',              label: 'Grade',           type: 'text', required: true },
+      { key: 'section',            label: 'Section',         type: 'text', required: true },
+      { key: 'class_teacher_name', label: 'Class Teacher',   type: 'text' },
+      { key: 'strength',           label: 'Strength',        type: 'number' },
+      { key: 'room_number',        label: 'Room No.',        type: 'text' },
+      { key: 'remarks',            label: 'Remarks',         type: 'text' },
+    ],
+    extraInsert: () => ({ school_id: SB.schoolId() }),
+  },
+  {
+    id: 'vp_tasks',
+    label: '✅ VP Tasks',
+    table: 'vp_tasks',
+    pkCol: 'task_id',
+    template: 'template_vp_tasks.xlsx',
+    columns: [
+      { key: 'task_id',     label: 'ID',         type: 'id',     readonly: true },
+      { key: 'title',       label: 'Title',       type: 'text',   required: true },
+      { key: 'description', label: 'Description', type: 'text' },
+      { key: 'task_type',   label: 'Type',        type: 'select', options: ['check','meeting','followup','admin','priority'], required: true },
+      { key: 'priority',    label: 'Priority',    type: 'select', options: ['high','medium','low'], required: true },
+      { key: 'due_date',    label: 'Due Date',    type: 'date' },
+      { key: 'assigned_to', label: 'Assigned To', type: 'text' },
+      { key: 'status',      label: 'Status',      type: 'select', options: ['pending','done','cancelled'] },
+    ],
+    extraInsert: () => ({ school_id: SB.schoolId() }),
+  },
+  {
+    id: 'academic_events',
+    label: '📅 Academic Events',
+    table: 'academic_events',
+    pkCol: 'event_id',
+    template: 'template_academic_events.xlsx',
+    columns: [
+      { key: 'event_id',          label: 'ID',           type: 'id',     readonly: true },
+      { key: 'event_name',        label: 'Event Name',   type: 'text',   required: true },
+      { key: 'start_date',        label: 'Start Date',   type: 'date',   required: true },
+      { key: 'end_date',          label: 'End Date',     type: 'date' },
+      { key: 'event_category',    label: 'Category',     type: 'select', options: ['exam','holiday','ptm','event','activity','term','other'], required: true },
+      { key: 'alert_days_before', label: 'Alert Days',   type: 'number' },
+      { key: 'notes',             label: 'Notes',        type: 'text' },
+    ],
+    extraInsert: () => ({ school_id: SB.schoolId(), academic_year_id: '2025-26' }),
+  },
+  {
+    id: 'revision_plans',
+    label: '📝 Revision Plans',
+    table: 'revision_plans',
+    pkCol: 'revision_plan_id',
+    template: 'template_revision_plans.xlsx',
+    columns: [
+      { key: 'revision_plan_id',  label: 'ID',           type: 'id',     readonly: true },
+      { key: 'plan_details',      label: 'Plan Details', type: 'text',   required: true },
+      { key: 'planned_start_date',label: 'Start Date',   type: 'date' },
+      { key: 'planned_end_date',  label: 'End Date',     type: 'date' },
+      { key: 'status',            label: 'Status',       type: 'select', options: ['submitted','approved','revision_needed','completed'] },
+    ],
+    extraInsert: () => ({ school_id: SB.schoolId(), academic_year_id: '2025-26', teacher_id: 1, section_id: 1, subject_id: 1 }),
+  },
+];
+
+// Template download URLs (served from same GitHub Pages folder)
+const TEMPLATE_FILES = {
+  teachers:          'template_teachers.xlsx',
+  subjects:          'template_subjects.xlsx',
+  sections:          'template_classes_sections.xlsx',
+  vp_tasks:          'template_vp_tasks.xlsx',
+  academic_events:   'template_academic_events.xlsx',
+  revision_plans:    'template_revision_plans.xlsx',
+};
+
+let dmActiveTable = 'teachers';
+let dmData = {};   // cache per table id
+
+function initDataManager() {
+  // Build tabs
+  const tabsEl = document.getElementById('dm-tabs');
+  tabsEl.innerHTML = DM_TABLES.map(t =>
+    `<button class="btn ${t.id === dmActiveTable ? 'btn-primary' : 'btn-ghost'} btn-sm" id="dm-tab-${t.id}" onclick="switchDMTable('${t.id}')">${t.label}</button>`
+  ).join('');
+  loadDMTable(dmActiveTable);
+}
+
+function switchDMTable(id) {
+  dmActiveTable = id;
+  DM_TABLES.forEach(t => {
+    const btn = document.getElementById('dm-tab-' + t.id);
+    if (btn) btn.className = 'btn ' + (t.id === id ? 'btn-primary' : 'btn-ghost') + ' btn-sm';
+  });
+  loadDMTable(id);
+}
+
+async function loadDMTable(id) {
+  const tdef = DM_TABLES.find(t => t.id === id);
+  if (!tdef) return;
+  renderDMPanel(tdef, null, true); // show loading state
+  try {
+    const rows = await SB.fetch(tdef.table, '?school_id=eq.' + SB.schoolId() + '&order=' + tdef.pkCol + '.asc&limit=200');
+    dmData[id] = rows;
+    renderDMPanel(tdef, rows, false);
+  } catch (e) {
+    renderDMPanel(tdef, [], false, 'Error loading: ' + e.message);
+  }
+}
+
+function renderDMPanel(tdef, rows, loading, errMsg) {
+  const panel = document.getElementById('dm-panel');
+  const visibleCols = tdef.columns.filter(c => c.type !== 'id');
+
+  panel.innerHTML = `
+  <div class="card">
+    <div class="card-header" style="flex-wrap:wrap;gap:10px;">
+      <div class="card-title">${tdef.label}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('${tdef.id}')">⬇️ Download Template</button>
+        <label class="btn btn-ghost btn-sm" style="cursor:pointer;">
+          ⬆️ Upload Excel
+          <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="handleExcelUpload(event,'${tdef.id}')">
+        </label>
+        <button class="btn btn-primary btn-sm" onclick="openDMAddRow('${tdef.id}')">+ Add Row</button>
+        <button class="btn btn-ghost btn-sm" onclick="loadDMTable('${tdef.id}')">🔄</button>
+      </div>
+    </div>
+    <div style="padding:12px 20px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);">
+      💡 <strong>Download Template</strong> → fill in Excel → <strong>Upload Excel</strong> to bulk-import. Or use <strong>+ Add Row</strong> to enter one by one.
+    </div>
+    <div style="overflow-x:auto;">
+      ${loading ? '<div class="empty" style="padding:40px;"><div class="loading-spinner" style="margin:auto;"></div></div>' :
+        errMsg ? `<div class="empty" style="padding:40px;"><div class="empty-icon">⚠️</div><div class="empty-text" style="color:var(--red);">${errMsg}</div></div>` :
+        !rows || !rows.length ? '<div class="empty" style="padding:40px;"><div class="empty-icon">📭</div><div class="empty-text">No records yet. Download the template, fill it in, and upload.</div></div>' :
+        renderDMTable(tdef, rows)
+      }
+    </div>
+  </div>
+
+  <!-- Upload preview -->
+  <div id="dm-upload-preview" style="display:none;margin-top:20px;"></div>
+
+  <!-- Add/Edit modal inline -->
+  <div class="modal-overlay" id="modal-dm-row">
+    <div class="modal" style="width:560px;">
+      <div class="modal-header">
+        <div class="modal-title" id="dm-row-modal-title">Add Row</div>
+        <button class="modal-close" onclick="closeModal('modal-dm-row')">✕</button>
+      </div>
+      <div class="modal-body" id="dm-row-modal-body"></div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-dm-row')">Cancel</button>
+        <button class="btn btn-primary" id="dm-save-btn" onclick="saveDMRow('${tdef.id}')">Save</button>
+      </div>
+    </div>
+  </div>
+  `;
+}
+
+function renderDMTable(tdef, rows) {
+  const visibleCols = tdef.columns.filter(c => c.type !== 'id');
+  let html = `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+  <thead><tr>
+    <th style="padding:10px 14px;text-align:left;background:var(--surface2);border-bottom:2px solid var(--border);color:var(--muted);font-weight:700;white-space:nowrap;">#</th>
+    ${visibleCols.map(c => `<th style="padding:10px 14px;text-align:left;background:var(--surface2);border-bottom:2px solid var(--border);color:var(--muted);font-weight:700;white-space:nowrap;">${c.label}</th>`).join('')}
+    <th style="padding:10px 14px;background:var(--surface2);border-bottom:2px solid var(--border);"></th>
+  </tr></thead><tbody>`;
+
+  rows.forEach((row, i) => {
+    const pk = row[tdef.pkCol];
+    html += `<tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+      <td style="padding:10px 14px;color:var(--muted);">${i+1}</td>
+      ${visibleCols.map(c => {
+        let val = row[c.key] ?? '';
+        if (c.type === 'date' && val) val = fmt(val.slice(0,10));
+        return `<td style="padding:10px 14px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${val}">${val}</td>`;
+      }).join('')}
+      <td style="padding:10px 14px;white-space:nowrap;">
+        <button class="btn btn-ghost btn-sm" onclick="openDMEditRow('${tdef.id}','${pk}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteDMRow('${tdef.id}','${pk}')">🗑️</button>
+      </td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+function buildDMForm(tdef, existingData) {
+  return tdef.columns.filter(c => !c.readonly).map(c => {
+    const val = existingData ? (existingData[c.key] ?? '') : '';
+    const req = c.required ? ' *' : '';
+    let input = '';
+    if (c.type === 'select') {
+      input = `<select class="form-select" id="dmf-${c.key}">
+        ${!c.required ? '<option value="">— select —</option>' : ''}
+        ${c.options.map(o => `<option value="${o}" ${o === val ? 'selected' : ''}>${o}</option>`).join('')}
+      </select>`;
+    } else if (c.type === 'date') {
+      input = `<input class="form-input" type="date" id="dmf-${c.key}" value="${val ? val.slice(0,10) : ''}">`;
+    } else if (c.type === 'number') {
+      input = `<input class="form-input" type="number" id="dmf-${c.key}" value="${val}">`;
+    } else {
+      input = `<input class="form-input" type="text" id="dmf-${c.key}" value="${val}" placeholder="${c.label}">`;
+    }
+    return `<div class="form-group"><label class="form-label">${c.label}${req}</label>${input}</div>`;
+  }).join('');
+}
+
+function openDMAddRow(tableId) {
+  const tdef = DM_TABLES.find(t => t.id === tableId);
+  document.getElementById('dm-row-modal-title').textContent = 'Add — ' + tdef.label;
+  document.getElementById('dm-row-modal-body').innerHTML = buildDMForm(tdef, null);
+  document.getElementById('dm-save-btn').dataset.editId = '';
+  openModal('modal-dm-row');
+}
+
+function openDMEditRow(tableId, pk) {
+  const tdef = DM_TABLES.find(t => t.id === tableId);
+  const row = (dmData[tableId] || []).find(r => String(r[tdef.pkCol]) === String(pk));
+  if (!row) return;
+  document.getElementById('dm-row-modal-title').textContent = 'Edit — ' + tdef.label;
+  document.getElementById('dm-row-modal-body').innerHTML = buildDMForm(tdef, row);
+  document.getElementById('dm-save-btn').dataset.editId = pk;
+  openModal('modal-dm-row');
+}
+
+async function saveDMRow(tableId) {
+  const tdef = DM_TABLES.find(t => t.id === tableId);
+  const btn = document.getElementById('dm-save-btn');
+  const editId = btn.dataset.editId;
+
+  // Gather form values
+  const data = {};
+  for (const c of tdef.columns.filter(col => !col.readonly)) {
+    const el = document.getElementById('dmf-' + c.key);
+    if (!el) continue;
+    let val = el.value.trim();
+    if (c.required && !val) { alert(c.label + ' is required.'); return; }
+    if (c.type === 'number') val = val ? parseFloat(val) : null;
+    data[c.key] = val || null;
+  }
+
+  btn.disabled = true; btn.textContent = 'Saving...';
+
+  try {
+    if (editId) {
+      await fetch(SB.url() + '/rest/v1/' + tdef.table + '?' + tdef.pkCol + '=eq.' + editId, {
+        method: 'PATCH',
+        headers: { 'apikey': SB.key(), 'Authorization': 'Bearer ' + SB.key(), 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify(data),
+      });
+    } else {
+      await SB.insert(tdef.table, { ...data, ...(tdef.extraInsert ? tdef.extraInsert() : {}) });
+    }
+    closeModal('modal-dm-row');
+    await loadDMTable(tableId);
+    // Refresh tasks/events if relevant
+    if (tableId === 'vp_tasks') { await loadTasks(); renderDashboard(); }
+    if (tableId === 'academic_events') { await loadEvents(); renderDashboard(); }
+  } catch (e) {
+    alert('Error saving: ' + e.message);
+  }
+  btn.disabled = false; btn.textContent = 'Save';
+}
+
+async function deleteDMRow(tableId, pk) {
+  if (!confirm('Delete this record? This cannot be undone.')) return;
+  const tdef = DM_TABLES.find(t => t.id === tableId);
+  try {
+    await SB.delete(tdef.table, tdef.pkCol, pk);
+    await loadDMTable(tableId);
+    if (tableId === 'vp_tasks') { await loadTasks(); renderDashboard(); }
+    if (tableId === 'academic_events') { await loadEvents(); renderDashboard(); }
+  } catch (e) { alert('Error deleting: ' + e.message); }
+}
+
+// ─── DOWNLOAD TEMPLATE ─────────────────────────────────────
+function downloadTemplate(tableId) {
+  const filename = TEMPLATE_FILES[tableId];
+  if (!filename) { alert('No template available for this table.'); return; }
+  // Templates are served from same folder on GitHub Pages
+  const a = document.createElement('a');
+  a.href = filename;
+  a.download = filename;
+  a.click();
+}
+
+// ─── EXCEL UPLOAD ──────────────────────────────────────────
+function handleExcelUpload(event, tableId) {
+  const file = event.target.files[0];
+  if (!file) return;
+  loadSheetJS(() => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const workbook = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        // Find header row (row 3 in our templates, index 2 in array)
+        const jsonRaw = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+        // Find header row — look for first row that contains a column we know
+        const tdef = DM_TABLES.find(t => t.id === tableId);
+        const knownKeys = tdef.columns.map(c => c.key);
+        let headerRowIdx = -1;
+        let headers = [];
+        for (let i = 0; i < Math.min(jsonRaw.length, 6); i++) {
+          const row = jsonRaw[i].map(v => String(v || '').toLowerCase().replace(/\s+/g,'_').replace(/\s*\*$/,'').replace(/\s*\(.*\)$/,'').trim());
+          const matches = row.filter(h => knownKeys.some(k => k === h || h.startsWith(k.split('_')[0])));
+          if (matches.length >= 2) { headerRowIdx = i; headers = jsonRaw[i]; break; }
+        }
+
+        if (headerRowIdx < 0) { alert('Could not find header row. Make sure you downloaded the template from this app.'); return; }
+
+        // Map column headers to field keys
+        const colMap = {};
+        headers.forEach((h, i) => {
+          const cleaned = String(h || '').toLowerCase().replace(/\s*\*$/,'').replace(/\s*\(.*\)$/,'').replace(/\s+/g,'_').trim();
+          const match = knownKeys.find(k => k === cleaned || cleaned.startsWith(k) || k.startsWith(cleaned.split('_')[0]));
+          if (match) colMap[i] = match;
+        });
+
+        // Parse data rows (skip header + any instruction rows, skip blank rows)
+        const dataRows = [];
+        for (let i = headerRowIdx + 1; i < jsonRaw.length; i++) {
+          const raw = jsonRaw[i];
+          if (!raw || raw.every(v => v === null || v === undefined || v === '')) continue;
+          // Skip instruction rows (first col starts with ⚠ or similar)
+          if (String(raw[0] || '').startsWith('⚠')) continue;
+          const obj = {};
+          Object.entries(colMap).forEach(([colIdx, key]) => {
+            let val = raw[colIdx];
+            if (val instanceof Date) val = val.toISOString().slice(0, 10);
+            else if (val !== null && val !== undefined) val = String(val).trim();
+            if (val !== '' && val !== undefined) obj[key] = val;
+          });
+          // Skip rows without required fields
+          const hasContent = tdef.columns.filter(c => c.required && c.type !== 'id').every(c => obj[c.key]);
+          if (!hasContent) continue;
+          dataRows.push(obj);
+        }
+
+        if (!dataRows.length) { alert('No data rows found. Make sure you filled in the template from Row 4 onwards.'); return; }
+
+        showUploadPreview(tableId, tdef, dataRows);
+      } catch (err) {
+        alert('Error reading Excel file: ' + err.message);
+      }
+      event.target.value = ''; // reset file input
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function showUploadPreview(tableId, tdef, rows) {
+  const preview = document.getElementById('dm-upload-preview');
+  const visibleCols = tdef.columns.filter(c => c.type !== 'id');
+
+  let tableHtml = `<table style="width:100%;border-collapse:collapse;font-size:11px;">
+  <thead><tr>
+    ${visibleCols.map(c => `<th style="padding:8px 12px;background:var(--amber-bg);border-bottom:2px solid #fcd34d;color:var(--amber);font-weight:700;text-align:left;white-space:nowrap;">${c.label}</th>`).join('')}
+  </tr></thead><tbody>
+  ${rows.slice(0, 20).map((row, i) => `<tr style="border-bottom:1px solid var(--border);${i%2===1?'background:var(--surface2)':''}">
+    ${visibleCols.map(c => `<td style="padding:8px 12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${row[c.key] ?? ''}</td>`).join('')}
+  </tr>`).join('')}
+  </tbody></table>`;
+
+  preview.style.display = 'block';
+  preview.innerHTML = `<div class="card">
+    <div class="card-header">
+      <div class="card-title">⬆️ Upload Preview — ${rows.length} rows ready to import</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('dm-upload-preview').style.display='none'">Cancel</button>
+        <button class="btn btn-primary btn-sm" id="confirm-import-btn" onclick="confirmImport('${tableId}')">✅ Confirm Import ${rows.length} Rows</button>
+      </div>
+    </div>
+    <div style="padding:10px 20px;background:var(--amber-bg);border-bottom:1px solid #fcd34d;font-size:11px;color:var(--amber);">
+      ⚠️ Showing first 20 of ${rows.length} rows. Existing records with same data will be skipped. New rows will be inserted.
+      ${rows.length > 20 ? ' Scroll right to see all columns.' : ''}
+    </div>
+    <div style="overflow-x:auto;">${tableHtml}</div>
+  </div>`;
+
+  preview.dataset.rows = JSON.stringify(rows);
+  preview.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function confirmImport(tableId) {
+  const tdef = DM_TABLES.find(t => t.id === tableId);
+  const preview = document.getElementById('dm-upload-preview');
+  const rows = JSON.parse(preview.dataset.rows || '[]');
+  const btn = document.getElementById('confirm-import-btn');
+
+  btn.disabled = true;
+  let success = 0, failed = 0, errors = [];
+
+  for (const row of rows) {
+    try {
+      const payload = { ...row, ...(tdef.extraInsert ? tdef.extraInsert() : {}) };
+      // Remove id field if blank
+      if (payload[tdef.pkCol] === '' || payload[tdef.pkCol] === null) delete payload[tdef.pkCol];
+      await SB.insert(tdef.table, payload);
+      success++;
+    } catch (e) {
+      failed++;
+      errors.push(e.message);
+    }
+    btn.textContent = `Importing... ${success+failed}/${rows.length}`;
+  }
+
+  preview.innerHTML = `<div class="card"><div class="card-body">
+    <div style="font-size:24px;margin-bottom:8px;">${failed === 0 ? '✅' : '⚠️'}</div>
+    <div style="font-weight:700;font-size:16px;margin-bottom:4px;">Import Complete</div>
+    <div style="color:var(--green);">✅ ${success} rows imported successfully</div>
+    ${failed ? `<div style="color:var(--red);margin-top:4px;">❌ ${failed} rows failed</div>` : ''}
+    ${errors.length ? `<details style="margin-top:10px;font-size:11px;color:var(--muted);"><summary>View errors</summary><pre>${errors.slice(0,5).join('\n')}</pre></details>` : ''}
+    <button class="btn btn-primary" style="margin-top:16px;" onclick="document.getElementById('dm-upload-preview').style.display='none'; loadDMTable('${tableId}')">View Table</button>
+  </div></div>`;
+
+  if (tableId === 'vp_tasks') { await loadTasks(); renderDashboard(); }
+  if (tableId === 'academic_events') { await loadEvents(); renderDashboard(); }
+}
 
 // ============================================================
 // INIT APP
