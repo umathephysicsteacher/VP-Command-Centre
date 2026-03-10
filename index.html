@@ -373,7 +373,7 @@ nav { position: relative; padding: 16px 12px; flex: 1; overflow-y: auto; }
   <div class="logo">
     <div class="logo-school">Samsidh School</div>
     <div class="logo-title">VP Command<br>Centre</div>
-    <div class="logo-sub">Narsapur · CBSE</div>
+    <div class="logo-sub">900 Students · CBSE</div>
   </div>
   <nav>
     <div class="nav-section">Main</div>
@@ -1513,114 +1513,236 @@ function loadSheetJS(cb) {
 }
 
 // Table definitions — maps to Supabase tables
+// ============================================================
+// DATA MANAGER TABLE DEFINITIONS
+// Column keys match EXACTLY the Supabase DDL column names.
+// Derived from DDL views:
+//   teachers: teacher_id, first_name, last_name, staff_code
+//   sections: section_id, section_name, class_id  (joins classes)
+//   classes:  class_id, class_name
+//   subjects: subject_id, subject_name, subject_code
+// VP Command Centre tables: exact from vp_command_centre_new_tables.sql
+// ============================================================
 const DM_TABLES = [
+  // ── TEACHERS ─────────────────────────────────────────────
+  // From view: t.first_name, t.last_name, t.staff_code, t.teacher_id
   {
     id: 'teachers',
     label: '👩‍🏫 Teachers',
     table: 'teachers',
     pkCol: 'teacher_id',
-    template: 'template_teachers.xlsx',
     columns: [
-      { key: 'teacher_id',   label: 'ID',           type: 'id',     readonly: true },
-      { key: 'full_name',    label: 'Full Name',     type: 'text',   required: true },
-      { key: 'short_name',   label: 'Short Name',    type: 'text',   required: true },
-      { key: 'designation',  label: 'Designation',   type: 'select', options: ['PGT','TGT','PRT','HOD','Coordinator','Principal','VP'], required: true },
-      { key: 'phone',        label: 'Phone',         type: 'text' },
-      { key: 'email',        label: 'Email',         type: 'text' },
+      { key: 'teacher_id',  label: 'ID',         type: 'id',   readonly: true },
+      { key: 'first_name',  label: 'First Name',  type: 'text', required: true },
+      { key: 'last_name',   label: 'Last Name',   type: 'text' },
+      { key: 'staff_code',  label: 'Staff Code',  type: 'text', required: true },
     ],
-    extraInsert: () => ({ school_id: SB.schoolId() }),
   },
+
+  // ── CLASSES ───────────────────────────────────────────────
+  // From view: cl.class_id, cl.class_name
+  {
+    id: 'classes',
+    label: '🏫 Classes',
+    table: 'classes',
+    pkCol: 'class_id',
+    columns: [
+      { key: 'class_id',   label: 'ID',         type: 'id',   readonly: true },
+      { key: 'class_name', label: 'Class Name',  type: 'text', required: true },
+    ],
+  },
+
+  // ── SECTIONS ─────────────────────────────────────────────
+  // From view: sc.section_id, sc.section_name, sc.class_id
+  {
+    id: 'sections',
+    label: '🏷️ Sections',
+    table: 'sections',
+    pkCol: 'section_id',
+    columns: [
+      { key: 'section_id',   label: 'ID',           type: 'id',     readonly: true },
+      { key: 'section_name', label: 'Section Name',  type: 'text',   required: true },
+      { key: 'class_id',     label: 'Class ID',      type: 'number', required: true, hint: 'Enter the Class ID from Classes table' },
+    ],
+  },
+
+  // ── SUBJECTS ─────────────────────────────────────────────
+  // From view: sub.subject_id, sub.subject_name; subject_code is standard
   {
     id: 'subjects',
     label: '📚 Subjects',
     table: 'subjects',
     pkCol: 'subject_id',
-    template: 'template_subjects.xlsx',
     columns: [
-      { key: 'subject_id',   label: 'ID',          type: 'id',     readonly: true },
-      { key: 'subject_name', label: 'Subject',      type: 'text',   required: true },
+      { key: 'subject_id',   label: 'ID',          type: 'id',   readonly: true },
+      { key: 'subject_name', label: 'Subject Name', type: 'text', required: true },
       { key: 'subject_code', label: 'Code',         type: 'text' },
-      { key: 'category',     label: 'Category',     type: 'select', options: ['Core','Language','Elective','Activity','Vocational'] },
-      { key: 'applicable_grades', label: 'Grades',  type: 'text' },
-      { key: 'remarks',      label: 'Remarks',      type: 'text' },
     ],
-    extraInsert: () => ({ school_id: SB.schoolId() }),
   },
-  {
-    id: 'sections',
-    label: '🏫 Classes & Sections',
-    table: 'sections',
-    pkCol: 'section_id',
-    template: 'template_classes_sections.xlsx',
-    columns: [
-      { key: 'section_id',  label: 'ID',       type: 'id',     readonly: true },
-      { key: 'grade',       label: 'Grade',     type: 'text',   required: true },
-      { key: 'section',     label: 'Section',   type: 'text',   required: true },
-      { key: 'strength',    label: 'Strength',  type: 'number' },
-      { key: 'room_number', label: 'Room No.',  type: 'text' },
-      { key: 'remarks',     label: 'Remarks',   type: 'text' },
-    ],
-    extraInsert: () => ({ school_id: SB.schoolId() }),
-  },
+
+  // ── VP TASKS ─────────────────────────────────────────────
+  // From: vp_command_centre_new_tables.sql — vp_tasks table
   {
     id: 'vp_tasks',
     label: '✅ VP Tasks',
     table: 'vp_tasks',
     pkCol: 'task_id',
-    template: 'template_vp_tasks.xlsx',
     columns: [
-      { key: 'task_id',     label: 'ID',         type: 'id',     readonly: true },
-      { key: 'title',       label: 'Title',       type: 'text',   required: true },
-      { key: 'description', label: 'Description', type: 'text' },
-      { key: 'task_type',   label: 'Type',        type: 'select', options: ['check','meeting','followup','admin','priority'], required: true },
-      { key: 'priority',    label: 'Priority',    type: 'select', options: ['high','medium','low'], required: true },
-      { key: 'due_date',    label: 'Due Date',    type: 'date' },
-      { key: 'assigned_to', label: 'Assigned To', type: 'text' },
-      { key: 'status',      label: 'Status',      type: 'select', options: ['pending','done','cancelled'] },
+      { key: 'task_id',     label: 'ID',          type: 'id',     readonly: true },
+      { key: 'title',       label: 'Title',        type: 'text',   required: true },
+      { key: 'description', label: 'Description',  type: 'text' },
+      { key: 'task_type',   label: 'Type',         type: 'select', required: true,
+        options: ['check','meeting','followup','admin','priority'] },
+      { key: 'priority',    label: 'Priority',     type: 'select', required: true,
+        options: ['high','medium','low'] },
+      { key: 'due_date',    label: 'Due Date',     type: 'date' },
+      { key: 'reminder_date', label: 'Reminder',   type: 'date' },
+      { key: 'assigned_to', label: 'Assigned To',  type: 'text' },
+      { key: 'status',      label: 'Status',       type: 'select',
+        options: ['pending','in_progress','done','cancelled'] },
+      { key: 'is_recurring',    label: 'Recurring',    type: 'select', options: ['false','true'] },
+      { key: 'recurrence_days', label: 'Repeat Days',  type: 'number' },
     ],
     extraInsert: () => ({ school_id: SB.schoolId() }),
   },
+
+  // ── ACADEMIC EVENTS ───────────────────────────────────────
+  // From: vp_command_centre_new_tables.sql — academic_events table
   {
     id: 'academic_events',
     label: '📅 Academic Events',
     table: 'academic_events',
     pkCol: 'event_id',
-    template: 'template_academic_events.xlsx',
     columns: [
       { key: 'event_id',          label: 'ID',           type: 'id',     readonly: true },
       { key: 'event_name',        label: 'Event Name',   type: 'text',   required: true },
+      { key: 'event_category',    label: 'Category',     type: 'select', required: true,
+        options: ['exam','ptm','event','activity','holiday','term','other'] },
       { key: 'start_date',        label: 'Start Date',   type: 'date',   required: true },
       { key: 'end_date',          label: 'End Date',     type: 'date' },
-      { key: 'event_category',    label: 'Category',     type: 'select', options: ['exam','holiday','ptm','event','activity','term','other'], required: true },
       { key: 'alert_days_before', label: 'Alert Days',   type: 'number' },
       { key: 'notes',             label: 'Notes',        type: 'text' },
     ],
     extraInsert: () => ({ school_id: SB.schoolId(), academic_year_id: '2025-26' }),
   },
+
+  // ── HOLIDAYS ─────────────────────────────────────────────
+  // From: vp_command_centre_new_tables.sql — holidays table
+  {
+    id: 'holidays',
+    label: '🎉 Holidays',
+    table: 'holidays',
+    pkCol: 'holiday_id',
+    columns: [
+      { key: 'holiday_id',   label: 'ID',           type: 'id',     readonly: true },
+      { key: 'holiday_date', label: 'Date',          type: 'date',   required: true },
+      { key: 'holiday_name', label: 'Holiday Name',  type: 'text',   required: true },
+      { key: 'holiday_type', label: 'Type',          type: 'select', required: true,
+        options: ['full','half','restricted'] },
+      { key: 'reason',       label: 'Reason',        type: 'text' },
+    ],
+    extraInsert: () => ({ school_id: SB.schoolId(), academic_year_id: '2025-26' }),
+  },
+
+  // ── SCHOOL SOP ───────────────────────────────────────────
+  // From: vp_command_centre_new_tables.sql — school_sop table
+  {
+    id: 'school_sop',
+    label: '📋 School SOP',
+    table: 'school_sop',
+    pkCol: 'sop_id',
+    columns: [
+      { key: 'sop_id',              label: 'ID',               type: 'id',     readonly: true },
+      { key: 'process_name',        label: 'Process Name',      type: 'text',   required: true },
+      { key: 'event_category',      label: 'Event Category',    type: 'select',
+        options: ['exam','ptm','event','activity','holiday','term','other'] },
+      { key: 'trigger_type',        label: 'Trigger',           type: 'select', required: true,
+        options: ['before','after','on'] },
+      { key: 'trigger_days',        label: 'Trigger Days',      type: 'number', required: true },
+      { key: 'action_description',  label: 'Action',            type: 'text',   required: true },
+      { key: 'responsible_person',  label: 'Responsible',       type: 'text' },
+      { key: 'auto_create_task',    label: 'Auto Create Task',  type: 'select',
+        options: ['true','false'] },
+      { key: 'is_active',           label: 'Active',            type: 'select',
+        options: ['true','false'] },
+    ],
+    extraInsert: () => ({ school_id: SB.schoolId() }),
+  },
+
+  // ── SUBSTITUTIONS ────────────────────────────────────────
+  // From: vp_command_centre_new_tables.sql — substitutions table
+  {
+    id: 'substitutions',
+    label: '🔄 Substitutions',
+    table: 'substitutions',
+    pkCol: 'substitution_id',
+    columns: [
+      { key: 'substitution_id',       label: 'ID',               type: 'id',     readonly: true },
+      { key: 'substitution_date',     label: 'Date',              type: 'date',   required: true },
+      { key: 'absent_teacher_id',     label: 'Absent Teacher ID', type: 'number', required: true },
+      { key: 'substitute_teacher_id', label: 'Sub Teacher ID',    type: 'number', required: true },
+      { key: 'section_id',            label: 'Section ID',        type: 'number', required: true },
+      { key: 'subject_id',            label: 'Subject ID',        type: 'number', required: true },
+      { key: 'period_number',         label: 'Period No.',        type: 'number' },
+      { key: 'absence_reason',        label: 'Reason',            type: 'select',
+        options: ['sick','personal','official','training','other'] },
+      { key: 'remarks',               label: 'Remarks',           type: 'text' },
+      { key: 'approved_by',           label: 'Approved By',       type: 'text' },
+    ],
+    extraInsert: () => ({ school_id: SB.schoolId() }),
+  },
+
+  // ── REVISION PLANS ───────────────────────────────────────
+  // From: vp_command_centre_new_tables.sql — revision_plans table
   {
     id: 'revision_plans',
     label: '📝 Revision Plans',
     table: 'revision_plans',
     pkCol: 'revision_plan_id',
-    template: 'template_revision_plans.xlsx',
     columns: [
-      { key: 'revision_plan_id',  label: 'ID',           type: 'id',     readonly: true },
-      { key: 'plan_details',      label: 'Plan Details', type: 'text',   required: true },
-      { key: 'planned_start_date',label: 'Start Date',   type: 'date' },
-      { key: 'planned_end_date',  label: 'End Date',     type: 'date' },
-      { key: 'status',            label: 'Status',       type: 'select', options: ['submitted','approved','revision_needed','completed'] },
+      { key: 'revision_plan_id',   label: 'ID',           type: 'id',     readonly: true },
+      { key: 'teacher_id',         label: 'Teacher ID',   type: 'number', required: true },
+      { key: 'section_id',         label: 'Section ID',   type: 'number', required: true },
+      { key: 'subject_id',         label: 'Subject ID',   type: 'number', required: true },
+      { key: 'plan_details',       label: 'Plan Details', type: 'text',   required: true },
+      { key: 'planned_start_date', label: 'Start Date',   type: 'date' },
+      { key: 'planned_end_date',   label: 'End Date',     type: 'date' },
+      { key: 'status',             label: 'Status',       type: 'select',
+        options: ['submitted','approved','revision_needed','completed'] },
+      { key: 'vp_remarks',         label: 'VP Remarks',   type: 'text' },
     ],
-    extraInsert: () => ({ school_id: SB.schoolId(), academic_year_id: '2025-26', teacher_id: 1, section_id: 1, subject_id: 1 }),
+    extraInsert: () => ({ school_id: SB.schoolId(), academic_year_id: '2025-26' }),
+  },
+
+  // ── BRIEFING LOGS ────────────────────────────────────────
+  // From: vp_command_centre_new_tables.sql — briefing_logs table
+  {
+    id: 'briefing_logs',
+    label: '📬 Briefing Logs',
+    table: 'briefing_logs',
+    pkCol: 'briefing_id',
+    readOnly: true,   // these are auto-generated, VP should only view
+    columns: [
+      { key: 'briefing_id',        label: 'ID',            type: 'id',   readonly: true },
+      { key: 'briefing_date',      label: 'Date',           type: 'date', readonly: true },
+      { key: 'sent_to_email',      label: 'Sent To',        type: 'text', readonly: true },
+      { key: 'briefing_content',   label: 'Content',        type: 'text', readonly: true },
+      { key: 'tasks_highlighted',  label: 'Tasks',          type: 'number', readonly: true },
+      { key: 'events_highlighted', label: 'Events',         type: 'number', readonly: true },
+      { key: 'send_status',        label: 'Status',         type: 'text', readonly: true },
+    ],
   },
 ];
 
 // Template download URLs (served from same GitHub Pages folder)
 const TEMPLATE_FILES = {
   teachers:          'template_teachers.xlsx',
-  subjects:          'template_subjects.xlsx',
+  classes:           'template_classes_sections.xlsx',
   sections:          'template_classes_sections.xlsx',
+  subjects:          'template_subjects.xlsx',
   vp_tasks:          'template_vp_tasks.xlsx',
   academic_events:   'template_academic_events.xlsx',
+  holidays:          'template_academic_events.xlsx',
   revision_plans:    'template_revision_plans.xlsx',
 };
 
@@ -1650,7 +1772,11 @@ async function loadDMTable(id) {
   if (!tdef) return;
   renderDMPanel(tdef, null, true); // show loading state
   try {
-    const rows = await SB.fetch(tdef.table, '?school_id=eq.' + SB.schoolId() + '&order=' + tdef.pkCol + '.asc&limit=200');
+    // Some base tables (classes, subjects) may not have school_id
+    const hasSchoolId = tdef.columns.some(c => c.key === 'school_id') || tdef.extraInsert;
+    const filter = hasSchoolId ? '?school_id=eq.' + SB.schoolId() + '&order=' + tdef.pkCol + '.asc&limit=200'
+                               : '?order=' + tdef.pkCol + '.asc&limit=200';
+    const rows = await SB.fetch(tdef.table, filter);
     dmData[id] = rows;
     renderDMPanel(tdef, rows, false);
   } catch (e) {
@@ -1668,11 +1794,11 @@ function renderDMPanel(tdef, rows, loading, errMsg) {
       <div class="card-title">${tdef.label}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
         <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('${tdef.id}')">⬇️ Download Template</button>
-        <label class="btn btn-ghost btn-sm" style="cursor:pointer;">
+        ${!tdef.readOnly ? `<label class="btn btn-ghost btn-sm" style="cursor:pointer;">
           ⬆️ Upload Excel
           <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="handleExcelUpload(event,'${tdef.id}')">
         </label>
-        <button class="btn btn-primary btn-sm" onclick="openDMAddRow('${tdef.id}')">+ Add Row</button>
+        <button class="btn btn-primary btn-sm" onclick="openDMAddRow('${tdef.id}')">+ Add Row</button>` : '<span style="font-size:11px;color:var(--muted);padding:4px 8px;">View only — auto-generated</span>'}
         <button class="btn btn-ghost btn-sm" onclick="loadDMTable('${tdef.id}')">🔄</button>
       </div>
     </div>
@@ -1727,8 +1853,8 @@ function renderDMTable(tdef, rows) {
         return `<td style="padding:10px 14px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${val}">${val}</td>`;
       }).join('')}
       <td style="padding:10px 14px;white-space:nowrap;">
-        <button class="btn btn-ghost btn-sm" onclick="openDMEditRow('${tdef.id}','${pk}')">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteDMRow('${tdef.id}','${pk}')">🗑️</button>
+        ${tdef.readOnly ? '' : `<button class="btn btn-ghost btn-sm" onclick="openDMEditRow('${tdef.id}','${pk}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteDMRow('${tdef.id}','${pk}')">🗑️</button>`}
       </td>
     </tr>`;
   });
@@ -1753,7 +1879,8 @@ function buildDMForm(tdef, existingData) {
     } else {
       input = `<input class="form-input" type="text" id="dmf-${c.key}" value="${val}" placeholder="${c.label}">`;
     }
-    return `<div class="form-group"><label class="form-label">${c.label}${req}</label>${input}</div>`;
+    const hintHtml = c.hint ? `<div style="font-size:11px;color:var(--muted);margin-top:3px;">💡 ${c.hint}</div>` : '';
+    return `<div class="form-group"><label class="form-label">${c.label}${req}</label>${input}${hintHtml}</div>`;
   }).join('');
 }
 
