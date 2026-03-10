@@ -223,6 +223,103 @@ nav { position: relative; padding: 16px 12px; flex: 1; overflow-y: auto; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
+/* LOGIN PAGE */
+.login-screen {
+  display: none;
+  position: fixed; inset: 0;
+  background: #1a1714;
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+.login-screen.active { display: flex; }
+.login-bg-pattern {
+  position: absolute; inset: 0; opacity: 0.04;
+  background-image: repeating-linear-gradient(45deg, #fff 0, #fff 1px, transparent 0, transparent 50%);
+  background-size: 24px 24px;
+}
+.login-glow {
+  position: absolute;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(194,24,126,0.15) 0%, transparent 70%);
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.login-box {
+  position: relative;
+  width: 420px;
+  background: #242018;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  padding: 48px 40px;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+  animation: loginIn 0.4s cubic-bezier(0.16,1,0.3,1);
+}
+@keyframes loginIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+.login-logo-school {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--accent);
+  margin-bottom: 8px;
+}
+.login-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: 32px; color: #fff; line-height: 1.15;
+  margin-bottom: 6px;
+}
+.login-sub {
+  font-size: 12px; color: rgba(255,255,255,0.35);
+  margin-bottom: 36px;
+}
+.login-label {
+  font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.4);
+  text-transform: uppercase; letter-spacing: 0.1em;
+  display: block; margin-bottom: 8px;
+}
+.login-input {
+  width: 100%; background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px; padding: 13px 16px;
+  color: #fff; font-family: 'Syne', sans-serif; font-size: 14px;
+  transition: all 0.2s; margin-bottom: 16px;
+}
+.login-input:focus {
+  outline: none; border-color: var(--accent);
+  background: rgba(194,24,126,0.08);
+  box-shadow: 0 0 0 3px rgba(194,24,126,0.15);
+}
+.login-input::placeholder { color: rgba(255,255,255,0.2); }
+.login-btn {
+  width: 100%; padding: 14px;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 10px;
+  font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: all 0.2s; margin-top: 4px;
+  letter-spacing: 0.02em;
+}
+.login-btn:hover { background: var(--accent2); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(194,24,126,0.4); }
+.login-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.login-error {
+  background: var(--red-bg); border: 1px solid #fecaca;
+  border-radius: 8px; padding: 10px 14px;
+  color: var(--red); font-size: 12px; margin-bottom: 16px;
+  display: none;
+}
+.login-error.show { display: block; }
+.login-footer {
+  text-align: center; margin-top: 24px;
+  font-size: 11px; color: rgba(255,255,255,0.2);
+}
+.logout-btn {
+  background: none; border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.4); border-radius: 6px;
+  padding: 5px 10px; font-size: 11px; cursor: pointer;
+  font-family: 'Syne', sans-serif; transition: all 0.15s;
+}
+.logout-btn:hover { border-color: var(--red); color: var(--red); }
+
 /* FILTER BAR */
 .filter-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
 .filter-bar .form-select { width: auto; min-width: 130px; }
@@ -235,6 +332,33 @@ nav { position: relative; padding: 16px 12px; flex: 1; overflow-y: auto; }
 </style>
 </head>
 <body>
+
+<!-- LOGIN SCREEN -->
+<div class="login-screen active" id="login-screen">
+  <div class="login-bg-pattern"></div>
+  <div class="login-glow"></div>
+  <div class="login-box">
+    <div class="login-logo-school">Samsidh School · Narsapur</div>
+    <div class="login-title">VP Command<br>Centre</div>
+    <div class="login-sub">Sign in to access your dashboard</div>
+
+    <div class="login-error" id="login-error"></div>
+
+    <label class="login-label">Email</label>
+    <input class="login-input" type="email" id="login-email"
+      placeholder="you@gmail.com"
+      onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
+
+    <label class="login-label">Password</label>
+    <input class="login-input" type="password" id="login-pass"
+      placeholder="••••••••"
+      onkeydown="if(event.key==='Enter')doLogin()">
+
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Sign In →</button>
+
+    <div class="login-footer">VP Command Centre · Samsidh School 2025–26</div>
+  </div>
+</div>
 
 <!-- LOADING OVERLAY -->
 <div class="loading-overlay" id="loading-overlay">
@@ -289,6 +413,7 @@ nav { position: relative; padding: 16px 12px; flex: 1; overflow-y: auto; }
       </div>
       <button class="btn btn-ghost" onclick="showPage('ai')">🤖 Ask AI</button>
       <button class="btn btn-primary" onclick="openAddTask()">+ Add Task</button>
+      <button class="logout-btn" onclick="doLogout()" title="Sign out">⎋ Logout</button>
     </div>
   </header>
 
@@ -712,29 +837,6 @@ let isConnected = false;
 // ============================================================
 // INIT
 // ============================================================
-async function init() {
-  showLoading('Connecting to Supabase...');
-  if (!SB.url() || !SB.key()) {
-    hideLoading();
-    setDBStatus(false, 'Not configured');
-    showPage('settings');
-    alert('Welcome! Please enter your Supabase URL and Anon Key in Settings to get started.');
-    return;
-  }
-  try {
-    await SB.fetch('schools', '?school_id=eq.' + SB.schoolId() + '&limit=1');
-    isConnected = true;
-    setDBStatus(true, 'Connected');
-    await refreshAll();
-  } catch (e) {
-    isConnected = false;
-    setDBStatus(false, 'Connection failed');
-    console.error(e);
-    alert('Could not connect to Supabase. Please check your credentials in Settings.');
-  }
-  hideLoading();
-}
-
 async function refreshAll() {
   await Promise.all([loadTasks(), loadEvents(), loadRevisions(), loadBriefings()]);
   renderDashboard();
@@ -1871,6 +1973,205 @@ async function confirmImport(tableId) {
 
   if (tableId === 'vp_tasks') { await loadTasks(); renderDashboard(); }
   if (tableId === 'academic_events') { await loadEvents(); renderDashboard(); }
+}
+
+// ============================================================
+// SUPABASE AUTH
+// ============================================================
+
+const AUTH = {
+  // Sign in with email + password
+  async signIn(email, password) {
+    const r = await fetch(SB.url() + '/auth/v1/token?grant_type=password', {
+      method: 'POST',
+      headers: {
+        'apikey': SB.key(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error_description || data.msg || 'Login failed');
+    return data; // { access_token, refresh_token, user, ... }
+  },
+
+  // Sign out
+  async signOut(accessToken) {
+    await fetch(SB.url() + '/auth/v1/logout', {
+      method: 'POST',
+      headers: {
+        'apikey': SB.key(),
+        'Authorization': 'Bearer ' + accessToken,
+        'Content-Type': 'application/json',
+      },
+    });
+  },
+
+  // Refresh session using refresh_token
+  async refresh(refreshToken) {
+    const r = await fetch(SB.url() + '/auth/v1/token?grant_type=refresh_token', {
+      method: 'POST',
+      headers: { 'apikey': SB.key(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error('Session expired');
+    return data;
+  },
+
+  // Save session to localStorage
+  saveSession(session) {
+    localStorage.setItem('vp_session', JSON.stringify({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+      expires_at: Date.now() + (session.expires_in * 1000),
+      user: session.user,
+    }));
+  },
+
+  // Load session from localStorage
+  loadSession() {
+    try { return JSON.parse(localStorage.getItem('vp_session')); }
+    catch { return null; }
+  },
+
+  clearSession() {
+    localStorage.removeItem('vp_session');
+  },
+
+  isExpired(session) {
+    return !session || Date.now() > (session.expires_at - 60000); // 1 min buffer
+  },
+};
+
+// Extend SB.fetch to use auth token when available
+const _sbFetchOrig = SB.fetch.bind(SB);
+SB.fetch = async function(table, params) {
+  const session = AUTH.loadSession();
+  const token = session ? session.access_token : SB.key();
+  params = params || '';
+  const r = await fetch(SB.url() + '/rest/v1/' + table + params, {
+    headers: {
+      'apikey': SB.key(),
+      'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json',
+    }
+  });
+  if (!r.ok) throw new Error('Supabase error ' + r.status + ': ' + await r.text());
+  return r.json();
+};
+
+// Login form handler
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-pass').value;
+  const btn   = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+
+  if (!email || !pass) { showLoginError('Please enter your email and password.'); return; }
+  if (!SB.url() || !SB.key()) {
+    // No Supabase configured yet — allow bypass to settings
+    showLoginError('Supabase not configured. Contact your admin.');
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = 'Signing in...';
+  errEl.classList.remove('show');
+
+  try {
+    const session = await AUTH.signIn(email, pass);
+    AUTH.saveSession(session);
+    hideLoginScreen();
+    await initApp();
+  } catch (e) {
+    showLoginError(e.message);
+  }
+  btn.disabled = false; btn.textContent = 'Sign In →';
+}
+
+function showLoginError(msg) {
+  const el = document.getElementById('login-error');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+function hideLoginScreen() {
+  document.getElementById('login-screen').classList.remove('active');
+}
+
+function showLoginScreen() {
+  document.getElementById('login-screen').classList.add('active');
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-pass').value = '';
+  document.getElementById('login-error').classList.remove('show');
+  document.getElementById('login-btn').textContent = 'Sign In →';
+}
+
+async function doLogout() {
+  if (!confirm('Sign out?')) return;
+  const session = AUTH.loadSession();
+  if (session) {
+    try { await AUTH.signOut(session.access_token); } catch {}
+  }
+  AUTH.clearSession();
+  // Clear in-memory data
+  tasks = []; events = []; revisions = []; briefings = [];
+  showLoginScreen();
+}
+
+// ============================================================
+// INIT — check session first
+// ============================================================
+async function init() {
+  // No Supabase configured at all → go to settings
+  if (!SB.url() || !SB.key()) {
+    hideLoginScreen();
+    showLoading('Loading...');
+    hideLoading();
+    setDBStatus(false, 'Not configured');
+    showPage('settings');
+    alert('Welcome! Please enter your Supabase URL and Anon Key in Settings first.');
+    return;
+  }
+
+  // Check existing session
+  let session = AUTH.loadSession();
+
+  if (session) {
+    // Refresh if near expiry
+    if (AUTH.isExpired(session)) {
+      try {
+        const refreshed = await AUTH.refresh(session.refresh_token);
+        AUTH.saveSession(refreshed);
+        session = AUTH.loadSession();
+      } catch {
+        AUTH.clearSession();
+        showLoginScreen();
+        return;
+      }
+    }
+    // Valid session — go straight to app
+    hideLoginScreen();
+    await initApp();
+  } else {
+    // No session — show login
+    showLoginScreen();
+  }
+}
+
+async function initApp() {
+  showLoading('Connecting to Supabase...');
+  try {
+    await SB.fetch('schools', '?school_id=eq.' + SB.schoolId() + '&limit=1');
+    isConnected = true;
+    setDBStatus(true, 'Connected');
+    await refreshAll();
+  } catch (e) {
+    isConnected = false;
+    setDBStatus(false, 'Connection failed');
+    console.error(e);
+  }
+  hideLoading();
 }
 
 // ============================================================
