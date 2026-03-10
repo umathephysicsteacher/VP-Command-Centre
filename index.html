@@ -373,7 +373,7 @@ nav { position: relative; padding: 16px 12px; flex: 1; overflow-y: auto; }
   <div class="logo">
     <div class="logo-school">Samsidh School</div>
     <div class="logo-title">VP Command<br>Centre</div>
-    <div class="logo-sub"> Narsapur · CBSE</div>
+    <div class="logo-sub">Narsapur · CBSE</div>
   </div>
   <nav>
     <div class="nav-section">Main</div>
@@ -1521,15 +1521,12 @@ const DM_TABLES = [
     pkCol: 'teacher_id',
     template: 'template_teachers.xlsx',
     columns: [
-      { key: 'teacher_id',   label: 'ID',          type: 'id',     readonly: true },
-      { key: 'full_name',    label: 'Full Name',    type: 'text',   required: true },
-      { key: 'short_name',   label: 'Short Name',   type: 'text',   required: true },
-      { key: 'designation',  label: 'Designation',  type: 'select', options: ['PGT','TGT','PRT','HOD','Coordinator','Principal','VP'], required: true },
-      { key: 'department',   label: 'Department',   type: 'text' },
-      { key: 'phone',        label: 'Phone',        type: 'text' },
-      { key: 'email',        label: 'Email',        type: 'text' },
-      { key: 'subjects_taught', label: 'Subjects',  type: 'text' },
-      { key: 'remarks',      label: 'Remarks',      type: 'text' },
+      { key: 'teacher_id',   label: 'ID',           type: 'id',     readonly: true },
+      { key: 'full_name',    label: 'Full Name',     type: 'text',   required: true },
+      { key: 'short_name',   label: 'Short Name',    type: 'text',   required: true },
+      { key: 'designation',  label: 'Designation',   type: 'select', options: ['PGT','TGT','PRT','HOD','Coordinator','Principal','VP'], required: true },
+      { key: 'phone',        label: 'Phone',         type: 'text' },
+      { key: 'email',        label: 'Email',         type: 'text' },
     ],
     extraInsert: () => ({ school_id: SB.schoolId() }),
   },
@@ -1556,13 +1553,12 @@ const DM_TABLES = [
     pkCol: 'section_id',
     template: 'template_classes_sections.xlsx',
     columns: [
-      { key: 'section_id',         label: 'ID',             type: 'id',   readonly: true },
-      { key: 'grade',              label: 'Grade',           type: 'text', required: true },
-      { key: 'section',            label: 'Section',         type: 'text', required: true },
-      { key: 'class_teacher_name', label: 'Class Teacher',   type: 'text' },
-      { key: 'strength',           label: 'Strength',        type: 'number' },
-      { key: 'room_number',        label: 'Room No.',        type: 'text' },
-      { key: 'remarks',            label: 'Remarks',         type: 'text' },
+      { key: 'section_id',  label: 'ID',       type: 'id',     readonly: true },
+      { key: 'grade',       label: 'Grade',     type: 'text',   required: true },
+      { key: 'section',     label: 'Section',   type: 'text',   required: true },
+      { key: 'strength',    label: 'Strength',  type: 'number' },
+      { key: 'room_number', label: 'Room No.',  type: 'text' },
+      { key: 'remarks',     label: 'Remarks',   type: 'text' },
     ],
     extraInsert: () => ({ school_id: SB.schoolId() }),
   },
